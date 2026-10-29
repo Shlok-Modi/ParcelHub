@@ -1,0 +1,42 @@
+#pragma once
+#include <memory>
+#include <optional>
+#include <unordered_map>
+#include <vector>
+#include "Graph.h"
+#include "Parcel.h"
+#include "PriorityQueue.h"
+
+struct DispatchResult {
+    Parcel parcel;              // status already set to Dispatched
+    bool reachable = false;
+    std::vector<int> path;      // hubs source..destination (empty if unreachable)
+    long long cost = 0;         // meaningful only if reachable
+};
+
+class DispatchEngine {
+public:
+    DispatchEngine(const Graph& graph, std::unique_ptr<PriorityQueue> queue);
+
+    // Throws invalid_argument on duplicate parcel id or hubs not in the graph.
+    void addParcel(const Parcel& p);
+    // Only genuine upgrades are allowed (new level more urgent than current).
+    void upgradePriority(int parcelId, ServiceLevel newLevel);
+    // Extracts the next parcel, marks it Dispatched, routes it with Dijkstra.
+    std::optional<DispatchResult> dispatchNext();
+
+    const Parcel* peekNext() const;
+    const Parcel* find(int id) const;
+    std::size_t pendingCount() const { return queue_->size(); }
+    std::size_t dispatchedCount() const { return dispatched_; }
+    std::size_t totalCount() const { return parcels_.size(); }
+    const PriorityQueue& queue() const { return *queue_; }
+
+private:
+    const Graph& graph_;
+    std::unique_ptr<PriorityQueue> queue_;
+    std::unordered_map<int, Parcel> parcels_;
+    std::size_t dispatched_ = 0;
+
+    static Key keyFor(const Parcel& p) { return {p.priority, p.arrival, p.id}; }
+};
