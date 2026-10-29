@@ -7,6 +7,7 @@
 #include "DispatchEngine.h"
 #include "Graph.h"
 #include "HeapFactory.h"
+#include "Prim.h"
 
 static std::string pathString(const std::vector<int>& path) {
     std::string s;
@@ -80,7 +81,7 @@ int main(int argc, char** argv) {
     }
 
     Graph g = makeSampleGraph();
-    std::cout << "=== ParcelHub - Phase 2 (using " << toString(type) << ") ===\n";
+    std::cout << "=== ParcelHub - Phase 3 (using " << toString(type) << ") ===\n";
     std::cout << "City graph: " << g.nodeCount() << " hubs, " << g.edgeCount()
               << " roads, connected: " << (g.isConnected() ? "yes" : "no (H8 is isolated)") << "\n\n";
 
@@ -92,6 +93,17 @@ int main(int argc, char** argv) {
         if (dr.dist[v] >= INF_DIST) std::cout << "unreachable\n";
         else std::cout << dr.dist[v] << "   (" << pathString(reconstructPath(dr, v)) << ")\n";
     }
+    std::cout << "\n";
+
+    auto primHeap = makeHeap(type);
+    PrimResult pr = prim(g, 1, *primHeap);
+    std::cout << "Minimum spanning " << (pr.isSpanningTree ? "tree" : "forest") << " (Prim, started at H1):\n";
+    for (const MstEdge& e : pr.edges)
+        std::cout << "  " << Graph::label(e.u) << " - " << Graph::label(e.v) << "   (" << e.weight << ")\n";
+    std::cout << "  Total weight: " << pr.totalWeight << "\n";
+    if (!pr.isSpanningTree)
+        std::cout << "  Note: the graph is disconnected (" << pr.components
+                  << " components), so this is a spanning forest, not a single spanning tree.\n";
     std::cout << "\n";
 
     runScenario(g, type, true);
@@ -115,6 +127,25 @@ int main(int argc, char** argv) {
         for (int id : r.order) std::cout << "P" << id << " ";
         std::cout << "\n";
     }
-    std::cout << "Dispatch order identical across all heaps: " << (identical ? "yes" : "NO") << "\n";
-    return identical ? 0 : 2;
+    std::cout << "Dispatch order identical across all heaps: " << (identical ? "yes" : "NO") << "\n\n";
+
+    std::cout << "--- Routing on every heap (from H1) ---\n"
+              << "Heap operations shown as inserts/extracts/decrease-keys/comparisons\n";
+    DijkstraResult refD; PrimResult refP; bool first = true, routingSame = true;
+    for (HeapType t : kAllHeapTypes) {
+        auto h1 = makeHeap(t), h2 = makeHeap(t);
+        DijkstraResult d = dijkstra(g, 1, *h1);
+        PrimResult p = prim(g, 1, *h2);
+        if (first) { refD = d; refP = p; first = false; }
+        routingSame = routingSame && d.dist == refD.dist && d.prev == refD.prev
+                      && p.edges == refP.edges && p.totalWeight == refP.totalWeight;
+        auto ops = [](const OpCounters& c) {
+            return std::to_string(c.inserts) + "/" + std::to_string(c.extracts) + "/" +
+                   std::to_string(c.decreaseKeys) + "/" + std::to_string(c.comparisons);
+        };
+        std::cout << std::left << std::setw(16) << toString(t) << "Dijkstra " << std::setw(12) << ops(d.heapOps)
+                  << "Prim " << ops(p.heapOps) << "\n";
+    }
+    std::cout << "Distances, paths and MST identical across all heaps: " << (routingSame ? "yes" : "NO") << "\n";
+    return (identical && routingSame) ? 0 : 2;
 }

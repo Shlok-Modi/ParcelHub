@@ -19,19 +19,22 @@ const std::vector<Edge>& Graph::neighbors(int u) const {
     return adj_[u];
 }
 
-bool Graph::isConnected() const {
+int Graph::componentCount() const {
     std::vector<char> seen(n_ + 1, 0);
-    std::vector<int> stack{1};
-    seen[1] = 1;
-    int count = 0;
-    while (!stack.empty()) {
-        int u = stack.back();
-        stack.pop_back();
-        ++count;
-        for (const Edge& e : adj_[u])
-            if (!seen[e.to]) { seen[e.to] = 1; stack.push_back(e.to); }
+    int components = 0;
+    for (int s = 1; s <= n_; ++s) {
+        if (seen[s]) continue;
+        ++components;
+        std::vector<int> stack{s};
+        seen[s] = 1;
+        while (!stack.empty()) {
+            int u = stack.back();
+            stack.pop_back();
+            for (const Edge& e : adj_[u])
+                if (!seen[e.to]) { seen[e.to] = 1; stack.push_back(e.to); }
+        }
     }
-    return count == n_;
+    return components;
 }
 
 Graph makeSampleGraph() {

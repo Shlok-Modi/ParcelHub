@@ -18,7 +18,8 @@ public:
     // Throws invalid_argument for invalid hubs, self-loops, or negative weights.
     void addEdge(int u, int v, long long weight);
     const std::vector<Edge>& neighbors(int u) const;
-    bool isConnected() const;
+    bool isConnected() const { return componentCount() == 1; }
+    int componentCount() const;
 
     static std::string label(int v) { return "H" + std::to_string(v); }
 

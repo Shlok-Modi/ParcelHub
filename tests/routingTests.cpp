@@ -1,3 +1,4 @@
+#include <memory>
 #include <random>
 #include <vector>
 #include "BinaryHeap.h"
@@ -74,5 +75,37 @@ int main() {
             CHECK(sum == got.dist[v]);
         }
     }
+    // Edge cases: single hub, parallel edges, zero-weight chain, unreachable-only graph
+    {
+        Graph one(1);
+        BinaryHeap p1;
+        DijkstraResult r1 = dijkstra(one, 1, p1);
+        CHECK(r1.dist[1] == 0 && (reconstructPath(r1, 1) == std::vector<int>{1}));
+
+        Graph par(2);
+        par.addEdge(1, 2, 5); par.addEdge(1, 2, 3); par.addEdge(1, 2, 9);
+        BinaryHeap p2;
+        CHECK(dijkstra(par, 1, p2).dist[2] == 3);                 // cheapest parallel edge wins
+
+        Graph zero(4);
+        zero.addEdge(1, 2, 0); zero.addEdge(2, 3, 0); zero.addEdge(3, 4, 0);
+        BinaryHeap p3;
+        DijkstraResult r3 = dijkstra(zero, 1, p3);
+        CHECK(r3.dist[4] == 0 && (reconstructPath(r3, 4) == std::vector<int>{1, 2, 3, 4}));
+
+        Graph none(3);                                            // no edges at all
+        BinaryHeap p4;
+        DijkstraResult r4 = dijkstra(none, 2, p4);
+        CHECK(r4.dist[2] == 0 && r4.dist[1] >= INF_DIST && r4.dist[3] >= INF_DIST);
+        CHECK(reconstructPath(r4, 1).empty());
+
+        // Equal-cost routes: the path chosen must be the same every run and sum to the right cost
+        Graph tie(4);
+        tie.addEdge(1, 2, 1); tie.addEdge(1, 3, 1); tie.addEdge(2, 4, 1); tie.addEdge(3, 4, 1);
+        BinaryHeap p5, p6;
+        CHECK(dijkstra(tie, 1, p5).prev == dijkstra(tie, 1, p6).prev);
+        CHECK(dijkstra(tie, 1, *std::make_unique<BinaryHeap>()).dist[4] == 2);
+    }
+    CHECK(makeSampleGraph().componentCount() == 2);
     return finishTests("routingTests");
 }

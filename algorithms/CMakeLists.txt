@@ -17,6 +17,7 @@ add_library(parcelhub_core
   src/FibonacciHeap.cpp
   src/HeapFactory.cpp
   src/Dijkstra.cpp
+  src/Prim.cpp
   src/DispatchEngine.cpp)
 target_include_directories(parcelhub_core PUBLIC include)
 
@@ -24,7 +25,7 @@ add_executable(parcelhub src/main.cpp)
 target_link_libraries(parcelhub parcelhub_core)
 
 enable_testing()
-foreach(t heapTests crossHeapTests routingTests dispatchTests)
+foreach(t heapTests crossHeapTests routingTests primTests dispatchTests)
   add_executable(${t} ../tests/${t}.cpp)
   target_link_libraries(${t} parcelhub_core)
   target_include_directories(${t} PRIVATE ../tests)

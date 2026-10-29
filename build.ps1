@@ -10,7 +10,7 @@ Write-Host "Compiling demo..."
 if ($LASTEXITCODE -ne 0) { throw "Compile failed: parcelhub" }
 
 $failed = 0
-foreach ($t in "heapTests", "crossHeapTests", "routingTests", "dispatchTests") {
+foreach ($t in "heapTests", "crossHeapTests", "routingTests", "primTests", "dispatchTests") {
     Write-Host "Compiling and running $t..."
     & g++ @flags @core "tests/$t.cpp" -o "build/$t.exe"
     if ($LASTEXITCODE -ne 0) { throw "Compile failed: $t" }
