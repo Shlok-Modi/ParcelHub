@@ -1,11 +1,25 @@
 #include "DispatchEngine.h"
-#include "BinaryHeap.h"
 #include "Dijkstra.h"
 #include <stdexcept>
 
-DispatchEngine::DispatchEngine(const Graph& graph, std::unique_ptr<PriorityQueue> queue)
-    : graph_(graph), queue_(std::move(queue)) {
+DispatchEngine::DispatchEngine(const Graph& graph, std::unique_ptr<PriorityQueue> queue, HeapType routingHeap)
+    : graph_(graph), queue_(std::move(queue)), routingHeap_(routingHeap) {
     if (!queue_) throw std::invalid_argument("DispatchEngine: queue is null");
+}
+
+DispatchEngine::DispatchEngine(const Graph& graph, HeapType type)
+    : DispatchEngine(graph, makeHeap(type), type) {}
+
+void DispatchEngine::mergeFrom(DispatchEngine& other) {
+    if (&other == this) throw std::invalid_argument("mergeFrom: cannot merge an engine with itself");
+    if (&other.graph_ != &graph_) throw std::invalid_argument("mergeFrom: engines use different city graphs");
+    for (const auto& kv : other.parcels_)
+        if (parcels_.count(kv.first)) throw std::invalid_argument("mergeFrom: parcel id exists in both hubs");
+    queue_->mergeFrom(*other.queue_);   // throws on heap-type mismatch before anything changes
+    parcels_.insert(other.parcels_.begin(), other.parcels_.end());
+    dispatched_ += other.dispatched_;
+    other.parcels_.clear();
+    other.dispatched_ = 0;
 }
 
 void DispatchEngine::addParcel(const Parcel& p) {
@@ -51,8 +65,8 @@ std::optional<DispatchResult> DispatchEngine::dispatchNext() {
 
     DispatchResult res;
     res.parcel = p;
-    BinaryHeap routingHeap;
-    DijkstraResult dr = dijkstra(graph_, p.source, routingHeap);
+    auto routingHeap = makeHeap(routingHeap_);
+    DijkstraResult dr = dijkstra(graph_, p.source, *routingHeap);
     res.path = reconstructPath(dr, p.destination);
     res.reachable = !res.path.empty();
     if (res.reachable) res.cost = dr.dist[p.destination];

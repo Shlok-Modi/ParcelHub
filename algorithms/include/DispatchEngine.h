@@ -4,6 +4,7 @@
 #include <unordered_map>
 #include <vector>
 #include "Graph.h"
+#include "HeapFactory.h"
 #include "Parcel.h"
 #include "PriorityQueue.h"
 
@@ -16,7 +17,11 @@ struct DispatchResult {
 
 class DispatchEngine {
 public:
-    DispatchEngine(const Graph& graph, std::unique_ptr<PriorityQueue> queue);
+    // Dispatch queue and the heap used inside Dijkstra routing can be chosen separately.
+    DispatchEngine(const Graph& graph, std::unique_ptr<PriorityQueue> queue,
+                   HeapType routingHeap = HeapType::Binary);
+    // Convenience: use the same heap type for both.
+    DispatchEngine(const Graph& graph, HeapType type);
 
     // Throws invalid_argument on duplicate parcel id or hubs not in the graph.
     void addParcel(const Parcel& p);
@@ -24,6 +29,11 @@ public:
     void upgradePriority(int parcelId, ServiceLevel newLevel);
     // Extracts the next parcel, marks it Dispatched, routes it with Dijkstra.
     std::optional<DispatchResult> dispatchNext();
+
+    // Combines two hubs' queues. Both engines must share the same graph and heap
+    // type, and no parcel id may appear in both. On failure nothing changes.
+    // `other` is left empty.
+    void mergeFrom(DispatchEngine& other);
 
     const Parcel* peekNext() const;
     const Parcel* find(int id) const;
@@ -35,6 +45,7 @@ public:
 private:
     const Graph& graph_;
     std::unique_ptr<PriorityQueue> queue_;
+    HeapType routingHeap_;
     std::unordered_map<int, Parcel> parcels_;
     std::size_t dispatched_ = 0;
 

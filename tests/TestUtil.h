@@ -2,9 +2,11 @@
 #include <iostream>
 
 inline int& failureCount() { static int f = 0; return f; }
+inline const char*& testContext() { static const char* c = ""; return c; }   // e.g. which heap is under test
 
 #define CHECK(cond) do { if (!(cond)) { \
-    std::cerr << "FAIL " << __FILE__ << ":" << __LINE__ << "  " << #cond << "\n"; ++failureCount(); } } while (0)
+    std::cerr << "FAIL [" << testContext() << "] " << __FILE__ << ":" << __LINE__ << "  " << #cond << "\n"; \
+    ++failureCount(); } } while (0)
 
 #define CHECK_THROWS(expr) do { bool threw_ = false; \
     try { expr; } catch (const std::exception&) { threw_ = true; } \

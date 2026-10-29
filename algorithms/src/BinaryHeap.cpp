@@ -76,3 +76,19 @@ void BinaryHeap::merge(BinaryHeap& other) {
     for (std::size_t i = a_.size() / 2; i-- > 0;) siftDown(i);
     ++c_.merges;
 }
+
+void BinaryHeap::mergeFrom(PriorityQueue& other) {
+    BinaryHeap* o = dynamic_cast<BinaryHeap*>(&other);
+    if (!o) throw std::invalid_argument("BinaryHeap::mergeFrom: other heap is a different type");
+    merge(*o);
+}
+
+bool BinaryHeap::checkInvariants() const {
+    if (pos_.size() != a_.size()) return false;
+    for (std::size_t i = 0; i < a_.size(); ++i) {
+        auto it = pos_.find(a_[i].id);
+        if (it == pos_.end() || it->second != i) return false;
+        if (i > 0 && a_[i].key < a_[(i - 1) / 2].key) return false;
+    }
+    return true;
+}

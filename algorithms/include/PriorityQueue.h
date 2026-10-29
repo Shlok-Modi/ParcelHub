@@ -25,9 +25,9 @@ struct OpCounters {
     long long inserts = 0, extracts = 0, decreaseKeys = 0, merges = 0, comparisons = 0;
 };
 
-// Common interface so Binomial/Fibonacci heaps can plug in during Phase 2.
-// merge() is intentionally NOT here: merging is only safe between heaps of the
-// same concrete type, so each heap exposes its own merge(SameType&).
+// Common interface implemented by Binary, Binomial and Fibonacci heaps.
+// mergeFrom() does a runtime type check: merging heaps of different concrete
+// types throws. Each heap also exposes a typed merge/meld for direct use.
 class PriorityQueue {
 public:
     virtual ~PriorityQueue() = default;
@@ -40,4 +40,12 @@ public:
     virtual std::size_t size() const = 0;
     virtual const OpCounters& counters() const = 0;
     virtual const char* name() const = 0;
+
+    // Moves every entry of `other` into this heap and empties `other`.
+    // Throws invalid_argument (changing nothing) if `other` is this heap, a
+    // different heap type, or shares any id with this heap.
+    virtual void mergeFrom(PriorityQueue& other) = 0;
+
+    // Structural self-check used by the tests (heap order, links, degrees, sizes).
+    virtual bool checkInvariants() const = 0;
 };

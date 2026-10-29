@@ -19,6 +19,8 @@ public:
     // O(n + m): append everything, then heapify. Empties `other`.
     // Throws invalid_argument (and changes nothing) if an id exists in both heaps.
     void merge(BinaryHeap& other);
+    void mergeFrom(PriorityQueue& other) override;
+    bool checkInvariants() const override;
 
 private:
     std::vector<HeapEntry> a_;
