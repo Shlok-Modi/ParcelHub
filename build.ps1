@@ -9,8 +9,12 @@ Write-Host "Compiling demo..."
 & g++ @flags @core algorithms/src/main.cpp -o build/parcelhub.exe
 if ($LASTEXITCODE -ne 0) { throw "Compile failed: parcelhub" }
 
+Write-Host "Compiling benchmark tool..."
+& g++ @flags @core algorithms/bench/benchmark_main.cpp -o build/parcelhub_bench.exe
+if ($LASTEXITCODE -ne 0) { throw "Compile failed: parcelhub_bench" }
+
 $failed = 0
-foreach ($t in "heapTests", "crossHeapTests", "routingTests", "primTests", "dispatchTests") {
+foreach ($t in "heapTests", "crossHeapTests", "routingTests", "primTests", "dispatchTests", "benchmarkTests") {
     Write-Host "Compiling and running $t..."
     & g++ @flags @core "tests/$t.cpp" -o "build/$t.exe"
     if ($LASTEXITCODE -ne 0) { throw "Compile failed: $t" }
@@ -18,4 +22,4 @@ foreach ($t in "heapTests", "crossHeapTests", "routingTests", "primTests", "disp
     if ($LASTEXITCODE -ne 0) { $failed++ }
 }
 if ($failed -gt 0) { Write-Host "$failed test suite(s) FAILED" -ForegroundColor Red; exit 1 }
-Write-Host "All test suites passed. Run the demo with:  .\build\parcelhub.exe [binary|binomial|fibonacci]" -ForegroundColor Green
+Write-Host "All test suites passed. Run the demo with:  .\build\parcelhub.exe [binary|binomial|fibonacci]   Benchmarks:  .\build\parcelhub_bench.exe --profile quick" -ForegroundColor Green

@@ -18,14 +18,21 @@ add_library(parcelhub_core
   src/HeapFactory.cpp
   src/Dijkstra.cpp
   src/Prim.cpp
-  src/DispatchEngine.cpp)
+  src/DispatchEngine.cpp
+  src/Workload.cpp
+  src/Reference.cpp
+  src/Benchmark.cpp
+  src/BenchmarkExport.cpp)
 target_include_directories(parcelhub_core PUBLIC include)
 
 add_executable(parcelhub src/main.cpp)
 target_link_libraries(parcelhub parcelhub_core)
 
+add_executable(parcelhub_bench bench/benchmark_main.cpp)
+target_link_libraries(parcelhub_bench parcelhub_core)
+
 enable_testing()
-foreach(t heapTests crossHeapTests routingTests primTests dispatchTests)
+foreach(t heapTests crossHeapTests routingTests primTests dispatchTests benchmarkTests)
   add_executable(${t} ../tests/${t}.cpp)
   target_link_libraries(${t} parcelhub_core)
   target_include_directories(${t} PRIVATE ../tests)
