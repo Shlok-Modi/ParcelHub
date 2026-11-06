@@ -3,5 +3,4 @@ build/
 *.exe
 node_modules/
 .env
-frontend\/dist\/
-results\/
+frontend/dist/
