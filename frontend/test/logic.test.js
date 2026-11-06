@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { layoutGraph, toBoard, fromBoard, BOARD } from '../src/layout.js';
-import { demoCity, cityProblems, pruneCity, loadCity, saveCity, routeRequest, dispatchRequest, LIMITS } from '../src/city.js';
+import { demoCity, cityProblems, pruneCity, loadCity, saveCity, routeRequest, dispatchRequest, mergeRequest, hubOfParcel, LIMITS } from '../src/city.js';
 import { parseReport, aggregate, slice, largestSizeSummary, spreadIsWide, available } from '../src/bench.js';
 import { niceStep, linearTicks, logTicks, compact, formatMs, formatTick, linearPos, logPos } from '../src/charts/scales.js';
 import { request, ApiError } from '../src/api.js';
@@ -160,5 +160,35 @@ describe('api request', () => {
     c.abort();
     await expect(p).rejects.toThrow('aborted');
     await expect(request('/x', { timeoutMs: 10 })).rejects.toMatchObject({ code: 'timeout' });
+  });
+});
+
+describe('merge request', () => {
+  it('splits the parcels between two hubs, alternating by default', () => {
+    const c = demoCity();
+    const r = mergeRequest(c, { heap: 'all' });
+    expect(r.hubA.map((p) => p.id)).toEqual([101, 103, 105]);
+    expect(r.hubB.map((p) => p.id)).toEqual([102, 104, 106]);
+    expect(r.heap).toBe('all');
+    expect(r.graph.nodes).toBe(c.nodes);
+  });
+  it('keeps every parcel exactly once', () => {
+    const c = demoCity();
+    const r = mergeRequest(c, { heap: 'binary', overrides: { 101: 'B', 102: 'B' } });
+    const ids = [...r.hubA, ...r.hubB].map((p) => p.id).sort();
+    expect(ids).toEqual(c.parcels.map((p) => p.id).sort());
+    expect(r.hubB.map((p) => p.id)).toContain(101);
+  });
+  it('applies upgrades before the parcels enter their hub', () => {
+    const c = demoCity();                                    // parcel 106 is Standard, upgraded to Express
+    const r = mergeRequest(c, { heap: 'binary' });
+    expect(r.hubB.find((p) => p.id === 106).level).toBe('express');
+    expect(c.parcels.find((p) => p.id === 106).level).toBe('standard');   // the city itself is not changed
+  });
+  it('handles no parcels and puts unassigned parcels by position', () => {
+    expect(mergeRequest({ ...demoCity(), parcels: [], upgrades: [] }, { heap: 'binary' })).toMatchObject({ hubA: [], hubB: [] });
+    expect(hubOfParcel({}, { id: 7 }, 0)).toBe('A');
+    expect(hubOfParcel({}, { id: 7 }, 1)).toBe('B');
+    expect(hubOfParcel({ 7: 'B' }, { id: 7 }, 0)).toBe('B');
   });
 });

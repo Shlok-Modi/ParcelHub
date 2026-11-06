@@ -7,7 +7,7 @@ import rateLimit from 'express-rate-limit';
 import { ApiError, BusyError, ValidationError } from './errors.js';
 import { createRunner, RunnerError } from './runner.js';
 import { SAMPLE } from './sample.js';
-import { HEAPS, validateBench, validateDispatch, validateMst, validateRoute } from './validate.js';
+import { HEAPS, validateBench, validateDispatch, validateMerge, validateMst, validateRoute } from './validate.js';
 
 const errorBody = (code, message) => ({ error: { code, message } });
 
@@ -90,7 +90,7 @@ export function createApp({ config, runner, benchRunner }) {
   };
 
   const endpoints = [
-    'GET /api/health', 'GET /api/sample', 'POST /api/route', 'POST /api/mst', 'POST /api/dispatch',
+    'GET /api/health', 'GET /api/sample', 'POST /api/route', 'POST /api/mst', 'POST /api/dispatch', 'POST /api/merge',
     'GET /api/benchmark/results', 'POST /api/benchmark/run',
   ];
   const serveFrontend = Boolean(config.frontendDist) && fsSync.existsSync(path.join(config.frontendDist, 'index.html'));
@@ -112,6 +112,9 @@ export function createApp({ config, runner, benchRunner }) {
   });
   app.post('/api/dispatch', requireJsonBody, async (req, res) => {
     res.json(await runOnHeaps(calc, validateDispatch(req.body)));
+  });
+  app.post('/api/merge', requireJsonBody, async (req, res) => {
+    res.json(await runOnHeaps(calc, validateMerge(req.body)));
   });
 
   // Results written by `parcelhub_bench` (Phase 4); read-only.

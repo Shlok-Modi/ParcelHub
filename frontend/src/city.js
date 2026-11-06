@@ -69,6 +69,22 @@ export function dispatchRequest(city, { heap }) {
   return { heap, graph: graphBody(city), parcels: city.parcels, upgrades: city.upgrades };
 }
 
+// Which hub holds each parcel for a merge. `overrides` maps parcel id -> 'A' | 'B'; parcels the
+// user has not assigned alternate between the hubs in list order, so there is something to merge at once.
+export const hubOfParcel = (overrides, parcel, index) => overrides[parcel.id] ?? (index % 2 === 0 ? 'A' : 'B');
+
+// Two hub queues made from the city's parcels. Upgrades are applied first: each parcel enters its hub's queue at its upgraded level.
+export function mergeRequest(city, { heap, overrides = {} }) {
+  const upgraded = new Map(city.upgrades.map((u) => [u.id, u.level]));
+  const hubA = [];
+  const hubB = [];
+  city.parcels.forEach((p, i) => {
+    const entry = { ...p, level: upgraded.get(p.id) ?? p.level };
+    (hubOfParcel(overrides, p, i) === 'B' ? hubB : hubA).push(entry);
+  });
+  return { heap, graph: graphBody(city), hubA, hubB };
+}
+
 // What changes when the city's shape changes: drop anything that points at a hub that no longer exists.
 export function pruneCity(city) {
   const ok = (h) => isInt(h) && h >= 1 && h <= city.nodes;

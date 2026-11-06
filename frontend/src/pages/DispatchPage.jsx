@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { postDispatch } from '../api.js';
 import GraphBoard from '../components/GraphBoard.jsx';
+import MergePanel from '../components/MergePanel.jsx';
 import { Agreement, Busy, Field, HeapSelect, HubSelect, Notice, OpsTable, Problems } from '../components/ui.jsx';
 import { cityProblems, dispatchRequest, hubLabel, LEVELS, levelLabel, levelRank, LIMITS } from '../city.js';
 import { pathText } from './RoutesPage.jsx';
@@ -77,6 +78,7 @@ export default function DispatchPage({ city, setCity }) {
           />
         </Busy>
         <ParcelEditor city={city} setCity={setCity} />
+        <MergePanel city={city} />
       </section>
 
       <aside className="inspector" aria-label="Dispatch queue">

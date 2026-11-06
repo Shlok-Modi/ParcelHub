@@ -192,6 +192,84 @@ describe('dispatch', () => {
   });
 });
 
+describe('merge', () => {
+  const split = (parcels, atIndex) => ({ hubA: parcels.slice(0, atIndex), hubB: parcels.slice(atIndex) });
+  const body = (extra = {}) => ({ graph: SAMPLE.graph, ...split(SAMPLE.parcels, 3), ...extra });
+
+  test('merging two hubs gives one queue in priority order, with every check passing', async () => {
+    const r = await post(`${s.url}/api/merge`, body({ heap: 'binomial' }));
+    assert.equal(r.status, 200);
+    assert.equal(r.json.command, 'merge');
+    assert.equal(r.json.merged, SAMPLE.parcels.length);
+    assert.equal(r.json.verified, true);
+    assert.deepEqual(Object.values(r.json.checks), [true, true, true, true, true]);
+    // Express (102, 104) first, then the same-day parcel, then standard in arrival order; hubs are interleaved.
+    assert.deepEqual(r.json.dispatches.map((d) => d.id), [102, 104, 103, 101, 105, 106]);
+    assert.deepEqual(r.json.dispatches.map((d) => d.origin), ['A', 'B', 'A', 'A', 'B', 'B']);
+    assert.equal(r.json.heapOps.merges, 1);
+    assert.equal(r.json.heapOps.inserts, SAMPLE.parcels.length);
+    assert.equal(r.json.heapOps.extracts, SAMPLE.parcels.length);
+  });
+
+  test('heap "all": every heap merges to the same queue, routes and checks', async () => {
+    const r = await post(`${s.url}/api/merge`, body({ heap: 'all' }));
+    assert.equal(r.status, 200);
+    assert.equal(r.json.identical, true);
+    assert.equal(r.json.results.length, 3);
+    for (const x of r.json.results) assert.equal(x.verified, true);
+  });
+
+  test('the merged order equals dispatching all the parcels from one hub', async () => {
+    const merged = await post(`${s.url}/api/merge`, body());
+    const single = await post(`${s.url}/api/dispatch`, { graph: SAMPLE.graph, parcels: SAMPLE.parcels });
+    assert.deepEqual(merged.json.dispatches.map(({ origin, ...d }) => d), single.json.dispatches);
+  });
+
+  test('either hub may be empty', async () => {
+    const one = await post(`${s.url}/api/merge`, { graph: SAMPLE.graph, hubA: SAMPLE.parcels, hubB: [] });
+    assert.equal(one.status, 200);
+    assert.equal(one.json.verified, true);
+    const none = await post(`${s.url}/api/merge`, { graph: SAMPLE.graph, hubA: [], hubB: [] });
+    assert.equal(none.status, 200);
+    assert.deepEqual(none.json.dispatches, []);
+  });
+
+  test('a parcel in both hubs is a 400 and nothing is dispatched', async () => {
+    const r = await post(`${s.url}/api/merge`, { graph: SAMPLE.graph, hubA: [SAMPLE.parcels[0]], hubB: [SAMPLE.parcels[0]] });
+    assert.equal(r.status, 400);
+    assert.match(r.json.error.message, /duplicate parcel id/);
+  });
+
+  test('bad requests: missing hub, unknown field, wrong content type', async () => {
+    assert.equal((await post(`${s.url}/api/merge`, { graph: SAMPLE.graph, hubA: [] })).status, 400);
+    assert.equal((await post(`${s.url}/api/merge`, body({ upgrades: [] }))).status, 400);
+    assert.equal((await post(`${s.url}/api/merge`, 'x', { headers: { 'content-type': 'text/plain' }, raw: true })).status, 415);
+  });
+
+  test('40 random splits: no parcel lost or duplicated, order equals the sorted dispatch keys, on every heap', async () => {
+    const rand = lcg(20240607);
+    for (let round = 0; round < 40; round++) {
+      const graph = randomGraph(rand, 12, 20);
+      const n = 1 + Math.floor(rand() * 40);
+      const parcels = Array.from({ length: n }, (_, i) => ({
+        id: 1000 + i, source: 1 + Math.floor(rand() * 12), destination: 1 + Math.floor(rand() * 12),
+        level: ['express', 'same-day', 'standard'][Math.floor(rand() * 3)], deadline: '12:00', arrival: Math.floor(rand() * 10),
+      }));
+      const hubA = [], hubB = [];
+      for (const p of parcels) (rand() < 0.5 ? hubA : hubB).push(p);
+      const rank = { express: 1, 'same-day': 2, standard: 3 };
+      const expected = [...parcels].sort((x, y) => rank[x.level] - rank[y.level] || x.arrival - y.arrival || x.id - y.id).map((p) => p.id);
+      const r = await post(`${s.url}/api/merge`, { heap: 'all', graph, hubA, hubB });
+      assert.equal(r.status, 200, JSON.stringify(r.json));
+      assert.equal(r.json.identical, true, `round ${round}`);
+      for (const x of r.json.results) {
+        assert.equal(x.verified, true, `round ${round} ${x.heap}`);
+        assert.deepEqual(x.dispatches.map((d) => d.id), expected, `round ${round} ${x.heap}`);
+      }
+    }
+  });
+});
+
 describe('invalid input', () => {
   const route = (b, opts) => post(`${s.url}/api/route`, b, opts);
 

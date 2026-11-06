@@ -315,3 +315,13 @@ table.data { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
   .tooltip { min-width: 0; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+/* Merge two hubs */
+.merge-panel .hub-pick { min-width: 6rem; }
+.merge-result h3 { margin: 20px 0 8px; }
+.checks { list-style: none; margin: 10px 0 12px; padding: 0; display: grid; gap: 4px; }
+.checks li { display: grid; grid-template-columns: 22px 1fr; }
+.checks li::before { content: "\2713"; color: var(--good); font-weight: 700; }
+.checks li.is-bad::before { content: "\2715"; color: var(--bad); }
+.origin { display: inline-block; font-size: 0.85rem; padding: 1px 7px; border-radius: 4px; color: var(--ink-2); border: 1px solid var(--rule-strong); }
+.origin-b { border-style: dashed; }

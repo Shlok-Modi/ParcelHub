@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { ValidationError } from '../src/errors.js';
-import { validateBench, validateDispatch, validateMst, validateRoute } from '../src/validate.js';
+import { validateBench, validateDispatch, validateMerge, validateMst, validateRoute } from '../src/validate.js';
 import { sampleGraph } from './helpers.js';
 
 const rejects = (fn, pattern) => assert.throws(fn, (e) => e instanceof ValidationError && (!pattern || pattern.test(e.message)));
@@ -100,4 +100,37 @@ test('every serialised request is only digits, fixed words and spaces', () => {
   const v = validateDispatch(dispatchBody({ upgrades: [] }));
   assert.match(v.input('fibonacci'), /^[a-z0-9 ]+\n$/);
   assert.match(validateRoute({ graph: sampleGraph(), source: 1 }).input('binary'), /^[a-z0-9 ]+\n$/);
+});
+
+test('merge: valid request becomes the exact stdin protocol (hub A, then hub B)', () => {
+  const g = { nodes: 3, edges: [{ from: 1, to: 2, weight: 4 }] };
+  const parcel = (id, level) => ({ id, source: 1, destination: 2, level, deadline: '10:00' });
+  const v = validateMerge({ heap: 'all', graph: g, hubA: [parcel(1, 'express')], hubB: [parcel(2, 'standard')] });
+  assert.equal(v.heap, 'all');
+  assert.equal(v.input('binomial'), 'merge binomial 3 1 1 2 4 1 1 1 2 1 600 0 1 2 1 2 3 600 0\n');
+});
+
+test('merge: a parcel id may appear in only one hub, and only once', () => {
+  const g = { nodes: 3, edges: [] };
+  const parcel = (id) => ({ id, source: 1, destination: 2, level: 'express', deadline: '10:00' });
+  rejects(() => validateMerge({ graph: g, hubA: [parcel(1)], hubB: [parcel(1)] }), /hubB\[0\]\.id: duplicate parcel id 1/);
+  rejects(() => validateMerge({ graph: g, hubA: [parcel(1), parcel(1)], hubB: [] }), /duplicate parcel id/);
+});
+
+test('merge: rejects missing hubs, unknown fields, bad parcels and too many parcels', () => {
+  const g = { nodes: 3, edges: [] };
+  const parcel = (id, extra = {}) => ({ id, source: 1, destination: 2, level: 'express', deadline: '10:00', ...extra });
+  rejects(() => validateMerge({ graph: g, hubA: [parcel(1)] }), /hubB must be an array/);
+  rejects(() => validateMerge({ graph: g, hubB: [parcel(1)] }), /hubA must be an array/);
+  rejects(() => validateMerge({ graph: g, hubA: [], hubB: [], upgrades: [] }), /unknown field/);
+  rejects(() => validateMerge({ graph: g, hubA: [parcel(1, { destination: 9 })], hubB: [] }), /destination/);
+  rejects(() => validateMerge({ graph: g, hubA: [parcel(1, { level: 'urgent' })], hubB: [] }), /level/);
+  rejects(() => validateMerge({ graph: g, hubA: [parcel('1; rm -rf /')], hubB: [] }), /id/);
+  const many = (from, n) => Array.from({ length: n }, (_, i) => parcel(from + i));
+  rejects(() => validateMerge({ graph: g, hubA: many(1, 300), hubB: many(1001, 300) }), /at most 500 parcels in total/);
+});
+
+test('merge: the serialised request is only digits, fixed words and spaces', () => {
+  const v = validateMerge({ graph: sampleGraph(), hubA: [], hubB: [] });
+  assert.match(v.input('fibonacci'), /^[a-z0-9 ]+\n$/);
 });

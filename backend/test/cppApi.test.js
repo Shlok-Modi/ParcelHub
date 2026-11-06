@@ -94,3 +94,34 @@ test('output is always a single JSON document', async () => {
     assert.equal(r.stdout.trim().split('\n').length, 1, input);
   }
 });
+
+test('merge: truncated, out-of-range and hostile requests are rejected', async () => {
+  await rejected('merge binary 3 0', /missing value/);
+  await rejected('merge binary 3 0 1 1 1 2 1 600 0', /missing value: hub B parcel count/);
+  await rejected('merge binary 3 0 1 1 1 2 1 600 0 0 extra', /extra input/);
+  await rejected('merge binary 3 0 20001', /hub A parcel count/);
+  await rejected('merge binary 3 0 0 20001', /hub B parcel count/);
+  await rejected('merge binary 3 0 1 1 1 9 1 600 0 0', /destination/);
+  await rejected('merge binary 3 0 1 1 1 2 4 600 0 0', /service level/);
+  await rejected('merge heap 3 0 0 0', /heap/);
+});
+
+test('merge: a parcel id in both hubs, or twice in one hub, is a clean error', async () => {
+  await rejected('merge binary 3 0 1 1 1 2 1 600 0 1 1 1 2 3 600 1', /exists in both hubs/);
+  await rejected('merge fibonacci 3 0 2 1 1 2 1 600 0 1 1 2 1 600 1 0', /duplicate parcel id/);
+});
+
+test('merge: empty hubs and one-sided merges work on every heap and verify', async () => {
+  const one = '1  1 1 2 1 600 0';            // one parcel: count, then id source destination level deadline arrival
+  for (const heap of ['binary', 'binomial', 'fibonacci']) {
+    for (const [hubs, n] of [['0 0', 0], [`${one} 0`, 1], [`0 ${one}`, 1]]) {
+      const input = `merge ${heap} 3 0 ${hubs}`;
+      const r = await run(input);
+      assert.equal(r.code, 0, `${heap}: ${input}: ${r.stdout}`);
+      const j = JSON.parse(r.stdout);
+      assert.equal(j.verified, true);
+      assert.equal(j.merged, n);
+      assert.equal(j.dispatches.length, n);
+    }
+  }
+});

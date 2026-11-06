@@ -59,5 +59,6 @@ export const getSample = (opts) => request('/api/sample', opts);
 export const postRoute = (body, opts) => request('/api/route', { ...opts, method: 'POST', body });
 export const postMst = (body, opts) => request('/api/mst', { ...opts, method: 'POST', body });
 export const postDispatch = (body, opts) => request('/api/dispatch', { ...opts, method: 'POST', body });
+export const postMerge = (body, opts) => request('/api/merge', { ...opts, method: 'POST', body });
 export const getBenchmarkResults = (opts) => request('/api/benchmark/results', opts);
 export const runBenchmark = (body, opts) => request('/api/benchmark/run', { timeoutMs: 150_000, ...opts, method: 'POST', body });

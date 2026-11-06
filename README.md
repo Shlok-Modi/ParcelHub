@@ -46,6 +46,7 @@ Needs Node 20 or newer. The server listens on 127.0.0.1 only unless you set `HOS
 | `POST /api/route` | Dijkstra: `{heap, graph, source, destination?}` -> distances (null = unreachable), path, cost, heap operation counts |
 | `POST /api/mst` | Prim: `{heap, graph, start?}` -> edges, total weight, components, `isSpanningTree` (false = forest) |
 | `POST /api/dispatch` | `{heap, graph, parcels, upgrades?}` -> parcels in dispatch order, each with route and cost |
+| `POST /api/merge` | `{heap, graph, hubA, hubB}` (two lists of parcels) -> merges the two hub queues, dispatches everything and returns the order, each parcel marked with its hub of origin. `verified` is true only if five checks pass: no parcel lost or duplicated, hub B empty, and the order equals the parcels sorted by priority, arrival, id. A parcel id in both hubs is a 400 |
 | `GET /api/benchmark/results[?format=csv]` | the files written by `parcelhub_bench` |
 | `POST /api/benchmark/run` | runs a small benchmark now (one at a time) and returns the verified report |
 
@@ -102,7 +103,7 @@ Reading the results: a lower comparison count does not always mean a lower time.
 
 ## Frontend (Phase 6)
 
-A React app (Vite) in `frontend/` with three pages: **Routes** (city map, shortest route, minimum spanning tree), **Dispatch** (run the dispatch, send parcels out one at a time, add parcels, and upgrade a parcel to a more urgent level; lower or equal levels are not offered, and an Express parcel cannot be upgraded) and **Benchmarks** (charts and a table from the saved benchmark results, or a file you open).
+A React app (Vite) in `frontend/` with three pages: **Routes** (city map, shortest route, minimum spanning tree), **Dispatch** (run the dispatch, send parcels out one at a time, add parcels, merge two hub queues, and upgrade a parcel to a more urgent level; lower or equal levels are not offered, and an Express parcel cannot be upgraded) and **Benchmarks** (charts and a table from the saved benchmark results, or a file you open).
 
 ```powershell
 # terminal 1: the calculation server

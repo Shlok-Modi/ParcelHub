@@ -11,16 +11,22 @@
 //   mst      <heap> <n> <m> {<u> <v> <w>}*m <start>
 //   dispatch <heap> <n> <m> {<u> <v> <w>}*m <k> {<id> <src> <dst> <level 1-3> <deadlineMin> <arrival>}*k
 //                                           <j> {<id> <newLevel 1-3>}*j
+//   merge    <heap> <n> <m> {<u> <v> <w>}*m <ka> {<id> <src> <dst> <level 1-3> <deadlineMin> <arrival>}*ka
+//                                           <kb> {<id> <src> <dst> <level 1-3> <deadlineMin> <arrival>}*kb
 //   bench    <seed> <repeats> <warmups> <instances>
 //            <ng> {<hubs>}*ng  <np> {<parcels>}*np  <nd> {<density>}*nd  <nb> {<benchmark>}*nb
 //   heap = binary | binomial | fibonacci
 //
 // Exit codes: 0 success, 2 invalid request (JSON error on stdout), 3 internal error.
+#include <algorithm>
 #include <iostream>
 #include <iterator>
 #include <sstream>
+#include <set>
 #include <stdexcept>
 #include <string>
+#include <tuple>
+#include <unordered_map>
 #include <vector>
 #include "Benchmark.h"
 #include "BenchmarkExport.h"
@@ -146,13 +152,7 @@ std::string runMst(Tokens& t) {
     return s.str();
 }
 
-std::string runDispatch(Tokens& t) {
-    HeapType type = readHeap(t);
-    Graph g = readGraph(t);
-    long long k = t.integer("parcel count", 0, kMaxParcels);
-    if (k * (static_cast<long long>(g.nodeCount()) + static_cast<long long>(g.edgeCount()) + 1) > kMaxWork)
-        throw RequestError("workload too large: reduce the number of parcels or the size of the city graph");
-    DispatchEngine engine(g, type);
+std::vector<Parcel> readParcels(Tokens& t, const Graph& g, long long k) {
     std::vector<Parcel> parcels;
     for (long long i = 0; i < k; ++i) {
         int id = static_cast<int>(t.integer("parcel id", 1, 1000000000));
@@ -163,6 +163,29 @@ std::string runDispatch(Tokens& t) {
         int arrival = static_cast<int>(t.integer("arrival", 0, 1000000000));
         parcels.push_back(makeParcel(id, src, dst, static_cast<ServiceLevel>(level), deadline, arrival));
     }
+    return parcels;
+}
+
+// One dispatched parcel as a JSON object WITHOUT the closing brace, so callers can add fields.
+std::string dispatchEntryOpen(const DispatchResult& r) {
+    const Parcel& p = r.parcel;
+    std::ostringstream s;
+    s << "{\"id\":" << p.id << ",\"level\":\"" << jsonEscape(toString(p.level)) << "\",\"priority\":" << p.priority
+      << ",\"arrival\":" << p.arrival << ",\"deadline\":\"" << formatTime(p.deadlineMinutes) << "\",\"source\":" << p.source
+      << ",\"destination\":" << p.destination << ",\"reachable\":" << (r.reachable ? "true" : "false")
+      << ",\"path\":" << pathJson(r.path) << ",\"cost\":";
+    if (r.reachable) s << r.cost; else s << "null";
+    return s.str();
+}
+
+std::string runDispatch(Tokens& t) {
+    HeapType type = readHeap(t);
+    Graph g = readGraph(t);
+    long long k = t.integer("parcel count", 0, kMaxParcels);
+    if (k * (static_cast<long long>(g.nodeCount()) + static_cast<long long>(g.edgeCount()) + 1) > kMaxWork)
+        throw RequestError("workload too large: reduce the number of parcels or the size of the city graph");
+    DispatchEngine engine(g, type);
+    std::vector<Parcel> parcels = readParcels(t, g, k);
     long long j = t.integer("upgrade count", 0, kMaxUpgrades);
     std::vector<std::pair<int, ServiceLevel>> upgrades;
     for (long long i = 0; i < j; ++i) {
@@ -183,16 +206,72 @@ std::string runDispatch(Tokens& t) {
     s << "{\"ok\":true,\"command\":\"dispatch\",\"heap\":\"" << jsonEscape(toString(type)) << "\",\"dispatches\":[";
     bool first = true;
     while (auto r = engine.dispatchNext()) {
-        const Parcel& p = r->parcel;
-        s << (first ? "" : ",") << "{\"id\":" << p.id << ",\"level\":\"" << jsonEscape(toString(p.level)) << "\",\"priority\":" << p.priority
-          << ",\"arrival\":" << p.arrival << ",\"deadline\":\"" << formatTime(p.deadlineMinutes) << "\",\"source\":" << p.source
-          << ",\"destination\":" << p.destination << ",\"reachable\":" << (r->reachable ? "true" : "false")
-          << ",\"path\":" << pathJson(r->path) << ",\"cost\":";
-        if (r->reachable) s << r->cost; else s << "null";
-        s << "}";
+        s << (first ? "" : ",") << dispatchEntryOpen(*r) << "}";
         first = false;
     }
     s << "],\"heapOps\":" << heapOpsJson(engine.queue().counters()) << "}";
+    return s.str();
+}
+
+std::string runMerge(Tokens& t) {
+    HeapType type = readHeap(t);
+    Graph g = readGraph(t);
+    long long ka = t.integer("hub A parcel count", 0, kMaxParcels);
+    std::vector<Parcel> a = readParcels(t, g, ka);
+    long long kb = t.integer("hub B parcel count", 0, kMaxParcels);
+    if (ka + kb > kMaxParcels) throw RequestError("too many parcels in total");
+    if ((ka + kb) * (static_cast<long long>(g.nodeCount()) + static_cast<long long>(g.edgeCount()) + 1) > kMaxWork)
+        throw RequestError("workload too large: reduce the number of parcels or the size of the city graph");
+    std::vector<Parcel> b = readParcels(t, g, kb);
+    t.expectEnd();
+
+    DispatchEngine hubA(g, type), hubB(g, type);
+    try {
+        for (const Parcel& p : a) hubA.addParcel(p);
+        for (const Parcel& p : b) hubB.addParcel(p);
+        hubA.mergeFrom(hubB);
+    } catch (const std::invalid_argument& e) {
+        throw RequestError(e.what());
+    }
+
+    // What the merged queue must contain and in which order, worked out without using any heap.
+    std::unordered_map<int, char> origin;
+    std::vector<std::tuple<int, int, int>> expected;   // (priority, arrival, id): the dispatch key
+    for (const Parcel& p : a) { origin[p.id] = 'A'; expected.emplace_back(p.priority, p.arrival, p.id); }
+    for (const Parcel& p : b) { origin[p.id] = 'B'; expected.emplace_back(p.priority, p.arrival, p.id); }
+    std::sort(expected.begin(), expected.end());
+
+    const std::size_t total = a.size() + b.size();
+    const bool countsMatch = hubA.pendingCount() == total && hubA.totalCount() == total;
+    const bool hubBEmpty = hubB.pendingCount() == 0 && hubB.totalCount() == 0;
+
+    std::ostringstream entries;
+    std::vector<int> order;
+    std::set<int> seen;
+    bool duplicates = false;
+    while (auto r = hubA.dispatchNext()) {
+        if (!seen.insert(r->parcel.id).second) duplicates = true;
+        order.push_back(r->parcel.id);
+        entries << (order.size() > 1 ? "," : "") << dispatchEntryOpen(*r) << ",\"origin\":\"" << origin[r->parcel.id] << "\"}";
+    }
+    bool noLoss = true;
+    for (const auto& e : expected) if (!seen.count(std::get<2>(e))) noLoss = false;
+    bool orderMatches = order.size() == expected.size();
+    for (std::size_t i = 0; orderMatches && i < order.size(); ++i) orderMatches = order[i] == std::get<2>(expected[i]);
+    const bool verified = countsMatch && hubBEmpty && noLoss && !duplicates && orderMatches;
+
+    OpCounters ops = hubA.queue().counters();            // hub B's own work (its inserts) is added in
+    const OpCounters& ob = hubB.queue().counters();
+    ops.inserts += ob.inserts; ops.extracts += ob.extracts; ops.decreaseKeys += ob.decreaseKeys;
+    ops.merges += ob.merges; ops.comparisons += ob.comparisons;
+
+    auto yes = [](bool v) { return v ? "true" : "false"; };
+    std::ostringstream s;
+    s << "{\"ok\":true,\"command\":\"merge\",\"heap\":\"" << jsonEscape(toString(type)) << "\",\"hubA\":{\"parcels\":" << ka
+      << "},\"hubB\":{\"parcels\":" << kb << "},\"merged\":" << total << ",\"verified\":" << yes(verified)
+      << ",\"checks\":{\"countsMatch\":" << yes(countsMatch) << ",\"hubBEmpty\":" << yes(hubBEmpty) << ",\"noParcelLost\":" << yes(noLoss)
+      << ",\"noDuplicates\":" << yes(!duplicates) << ",\"orderMatchesSortedKeys\":" << yes(orderMatches)
+      << "},\"dispatches\":[" << entries.str() << "],\"heapOps\":" << heapOpsJson(ops) << "}";
     return s.str();
 }
 
@@ -247,8 +326,9 @@ int main() {
         if (command == "route") out = runRoute(t);
         else if (command == "mst") out = runMst(t);
         else if (command == "dispatch") out = runDispatch(t);
+        else if (command == "merge") out = runMerge(t);
         else if (command == "bench") out = runBench(t);
-        else throw RequestError("unknown command (use route, mst, dispatch or bench)");
+        else throw RequestError("unknown command (use route, mst, dispatch, merge or bench)");
         std::cout << out << std::endl;
         return 0;
     } catch (const RequestError& e) {

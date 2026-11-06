@@ -100,13 +100,11 @@ function deadlineMinutes(value, path) {
   return Number(m[1]) * 60 + Number(m[2]);
 }
 
-export function validateDispatch(body) {
-  const b = object(body, 'request body', ['heap', 'graph', 'parcels', 'upgrades']);
-  const heap = heapField(b);
-  const graph = graphField(b.graph);
-  const ids = new Set();
-  const parcels = array(b.parcels, 'parcels', LIMITS.maxParcels).map((p, i) => {
-    const path = `parcels[${i}]`;
+// Validates a list of parcels. `ids` collects every parcel id seen so far, so a caller can
+// check several lists (the two hubs of a merge) against each other.
+function parcelList(value, name, graph, ids) {
+  return array(value, name, LIMITS.maxParcels).map((p, i) => {
+    const path = `${name}[${i}]`;
     const o = object(p, path, ['id', 'source', 'destination', 'level', 'deadline', 'arrival']);
     const id = integer(o.id, `${path}.id`, 1, 1_000_000_000);
     if (ids.has(id)) throw new ValidationError(`${path}.id: duplicate parcel id ${id}`);
@@ -120,6 +118,15 @@ export function validateDispatch(body) {
       arrival: o.arrival === undefined ? i : integer(o.arrival, `${path}.arrival`, 0, 1_000_000_000),
     };
   });
+}
+
+const parcelTokens = (parcels) => parcels.flatMap((p) => [p.id, p.source, p.destination, p.level, p.deadline, p.arrival].map(String));
+
+export function validateDispatch(body) {
+  const b = object(body, 'request body', ['heap', 'graph', 'parcels', 'upgrades']);
+  const heap = heapField(b);
+  const graph = graphField(b.graph);
+  const parcels = parcelList(b.parcels, 'parcels', graph, new Set());
   const levelOf = new Map(parcels.map((p) => [p.id, p.level]));
   const upgraded = new Set();
   const upgrades = array(b.upgrades ?? [], 'upgrades', LIMITS.maxUpgrades).map((u, i) => {
@@ -139,9 +146,31 @@ export function validateDispatch(body) {
       finish([
         'dispatch', h, ...graphTokens(graph),
         String(parcels.length),
-        ...parcels.flatMap((p) => [p.id, p.source, p.destination, p.level, p.deadline, p.arrival].map(String)),
+        ...parcelTokens(parcels),
         String(upgrades.length),
         ...upgrades.flatMap((u) => [u.id, u.level].map(String)),
+      ]),
+  };
+}
+
+// Merge two hub queues: both lists are validated together, so a parcel id may appear in only one hub.
+export function validateMerge(body) {
+  const b = object(body, 'request body', ['heap', 'graph', 'hubA', 'hubB']);
+  const heap = heapField(b);
+  const graph = graphField(b.graph);
+  const ids = new Set();
+  const hubA = parcelList(b.hubA, 'hubA', graph, ids);
+  const hubB = parcelList(b.hubB, 'hubB', graph, ids);
+  if (hubA.length + hubB.length > LIMITS.maxParcels) {
+    throw new ValidationError(`the two hubs may hold at most ${LIMITS.maxParcels} parcels in total`);
+  }
+  return {
+    heap,
+    input: (h) =>
+      finish([
+        'merge', h, ...graphTokens(graph),
+        String(hubA.length), ...parcelTokens(hubA),
+        String(hubB.length), ...parcelTokens(hubB),
       ]),
   };
 }
