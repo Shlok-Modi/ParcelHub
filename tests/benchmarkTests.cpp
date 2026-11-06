@@ -600,17 +600,21 @@ static void exportFormats() {
 
     // file writing, including creating missing folders
     namespace fs = std::filesystem;
-    fs::path dir = fs::temp_directory_path() / "parcelhub_bench_test" / "nested";
-    fs::remove_all(fs::temp_directory_path() / "parcelhub_bench_test");
+    const fs::path root = fs::temp_directory_path() / "parcelhub_bench_test";
+    const fs::path dir = root / "nested";
+    std::error_code ignored;                     // cleanup must never abort the test (Windows refuses to delete open files)
+    fs::remove_all(root, ignored);
     std::string err;
     CHECK(writeTextFile((dir / "out.csv").string(), csv, err));
-    std::ifstream back((dir / "out.csv").string(), std::ios::binary);
-    std::stringstream ss;
-    ss << back.rdbuf();
-    CHECK(ss.str() == csv);
+    {
+        std::ifstream back((dir / "out.csv").string(), std::ios::binary);
+        std::stringstream ss;
+        ss << back.rdbuf();
+        CHECK(ss.str() == csv);
+    }                                            // file closed here, before anything is deleted
     CHECK(!writeTextFile((dir / "out.csv" / "child.txt").string(), "x", err));   // parent is a file
     CHECK(!err.empty());
-    fs::remove_all(fs::temp_directory_path() / "parcelhub_bench_test");
+    fs::remove_all(root, ignored);
 }
 
 int main() {

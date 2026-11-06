@@ -3,7 +3,7 @@
 $ErrorActionPreference = "Stop"
 $core = Get-ChildItem algorithms/src -Filter *.cpp | Where-Object { $_.Name -ne "main.cpp" } | ForEach-Object { $_.FullName }
 New-Item -ItemType Directory -Force build | Out-Null
-$flags = @("-std=c++17", "-O2", "-Wall", "-Wextra", "-Ialgorithms/include", "-Itests")
+$flags = @("-std=c++17", "-O2", "-Wall", "-Wextra", "-static", "-Ialgorithms/include", "-Itests")
 
 Write-Host "Compiling demo..."
 & g++ @flags @core algorithms/src/main.cpp -o build/parcelhub.exe
@@ -12,6 +12,10 @@ if ($LASTEXITCODE -ne 0) { throw "Compile failed: parcelhub" }
 Write-Host "Compiling benchmark tool..."
 & g++ @flags @core algorithms/bench/benchmark_main.cpp -o build/parcelhub_bench.exe
 if ($LASTEXITCODE -ne 0) { throw "Compile failed: parcelhub_bench" }
+
+Write-Host "Compiling API program (used by the backend)..."
+& g++ @flags @core algorithms/api/api_main.cpp -o build/parcelhub_api.exe
+if ($LASTEXITCODE -ne 0) { throw "Compile failed: parcelhub_api" }
 
 $failed = 0
 foreach ($t in "heapTests", "crossHeapTests", "routingTests", "primTests", "dispatchTests", "benchmarkTests") {
@@ -22,4 +26,4 @@ foreach ($t in "heapTests", "crossHeapTests", "routingTests", "primTests", "disp
     if ($LASTEXITCODE -ne 0) { $failed++ }
 }
 if ($failed -gt 0) { Write-Host "$failed test suite(s) FAILED" -ForegroundColor Red; exit 1 }
-Write-Host "All test suites passed. Run the demo with:  .\build\parcelhub.exe [binary|binomial|fibonacci]   Benchmarks:  .\build\parcelhub_bench.exe --profile quick" -ForegroundColor Green
+Write-Host "All test suites passed. Run the demo with:  .\build\parcelhub.exe [binary|binomial|fibonacci]   Benchmarks:  .\build\parcelhub_bench.exe --profile quick   Backend: cd backend; npm install; npm start   Frontend: cd frontend; npm install; npm run dev" -ForegroundColor Green

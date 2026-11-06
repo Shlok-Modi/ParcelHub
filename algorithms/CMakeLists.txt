@@ -31,6 +31,9 @@ target_link_libraries(parcelhub parcelhub_core)
 add_executable(parcelhub_bench bench/benchmark_main.cpp)
 target_link_libraries(parcelhub_bench parcelhub_core)
 
+add_executable(parcelhub_api api/api_main.cpp)
+target_link_libraries(parcelhub_api parcelhub_core)
+
 enable_testing()
 foreach(t heapTests crossHeapTests routingTests primTests dispatchTests benchmarkTests)
   add_executable(${t} ../tests/${t}.cpp)
