@@ -8,6 +8,7 @@ Priority parcel dispatch and routing engine (DAA project).
 - **Phase 3** - Prim's algorithm (minimum spanning tree/forest) on any heap, graph component counting, routing edge-case tests.
 - **Phase 4** - benchmark engine: seeded graph and parcel generators, timers, operation counters, repeated runs with statistics, CSV/JSON export, and a correctness check on every run.
 - **Phase 5** - Express backend (`backend/`) that runs the C++ code safely and serves JSON to the frontend.
+- **Phase 6** - React frontend (`frontend/`): city map with shortest route and spanning tree, dispatch simulator, benchmark charts.
 
 ## Build and test
 
@@ -101,7 +102,7 @@ Reading the results: a lower comparison count does not always mean a lower time.
 
 ## Frontend (Phase 6)
 
-A React app (Vite) in `frontend/` with three pages: **Routes** (city map, shortest route, minimum spanning tree), **Dispatch** (run the dispatch, send parcels out one at a time, add and upgrade parcels) and **Benchmarks** (charts and a table from the saved benchmark results, or a file you open).
+A React app (Vite) in `frontend/` with three pages: **Routes** (city map, shortest route, minimum spanning tree), **Dispatch** (run the dispatch, send parcels out one at a time, add parcels, and upgrade a parcel to a more urgent level; lower or equal levels are not offered, and an Express parcel cannot be upgraded) and **Benchmarks** (charts and a table from the saved benchmark results, or a file you open).
 
 ```powershell
 # terminal 1: the calculation server
@@ -121,7 +122,7 @@ cd frontend; npm install; npm run dev
 - `PriorityQueue` is the common interface. Dijkstra and DispatchEngine take it, so any heap plugs in.
 - `mergeFrom()` checks the heap type at runtime and throws on a mismatch; typed `merge()` / `meld()` are also available. A rejected merge changes nothing.
 - Dijkstra uses decrease-key (not lazy deletion) so the heaps are compared like for like.
-- Upgrades must raise urgency; downgrades and same-level upgrades are rejected.
+- Upgrades must raise urgency; downgrades and same-level upgrades are rejected by the API (400), and the Dispatch page only offers more urgent levels.
 - Prim on a disconnected graph returns a minimum spanning FOREST: `isSpanningTree` is false and `components` gives the tree count. It is never presented as a single MST.
 - Zero-weight edges and parallel edges are supported (the cheapest parallel edge wins). Negative weights and self-loops are rejected when the edge is added.
 
