@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getHealth } from './api.js';
 import { loadCity, saveCity } from './city.js';
+import AlgorithmsPage from './pages/AlgorithmsPage.jsx';
 import BenchmarksPage from './pages/BenchmarksPage.jsx';
 import DispatchPage from './pages/DispatchPage.jsx';
 import RoutesPage from './pages/RoutesPage.jsx';
@@ -8,6 +9,7 @@ import RoutesPage from './pages/RoutesPage.jsx';
 const PAGES = [
   { id: 'routes', label: 'Routes' },
   { id: 'dispatch', label: 'Dispatch' },
+  { id: 'algorithms', label: 'Algorithms' },
   { id: 'benchmarks', label: 'Benchmarks' },
 ];
 
@@ -67,7 +69,7 @@ export default function App() {
           {status === 'up' ? 'Server running' : status === 'checking' ? 'Checking server…' : status === 'noprogram' ? 'Server up, C++ program missing' : 'Server not running'}
         </span>
       </header>
-      {(status === 'down' || status === 'noprogram') && page !== 'benchmarks' && (
+      {(status === 'down' || status === 'noprogram') && page !== 'benchmarks' && page !== 'algorithms' && (
         <div className="banner" role="alert">
           {status === 'down'
             ? <>The calculation server isn't running, so routes and dispatch can't be calculated. In the <code>backend</code> folder run <code>npm start</code>.</>
@@ -77,6 +79,7 @@ export default function App() {
       <main id="main">
         {page === 'routes' && <RoutesPage city={city} setCity={setCity} />}
         {page === 'dispatch' && <DispatchPage city={city} setCity={setCity} />}
+        {page === 'algorithms' && <AlgorithmsPage />}
         {page === 'benchmarks' && <BenchmarksPage />}
       </main>
     </>

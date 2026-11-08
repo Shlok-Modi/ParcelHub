@@ -103,7 +103,7 @@ Reading the results: a lower comparison count does not always mean a lower time.
 
 ## Frontend (Phase 6)
 
-A React app (Vite) in `frontend/` with three pages: **Routes** (city map, shortest route, minimum spanning tree), **Dispatch** (run the dispatch, send parcels out one at a time, add parcels, merge two hub queues, and upgrade a parcel to a more urgent level; lower or equal levels are not offered, and an Express parcel cannot be upgraded) and **Benchmarks** (charts and a table from the saved benchmark results, or a file you open).
+A React app (Vite) in `frontend/` with four pages: **Routes** (city map, shortest route, minimum spanning tree), **Dispatch** (run the dispatch, send parcels out one at a time, add parcels, merge two hub queues, and upgrade a parcel to a more urgent level; lower or equal levels are not offered, and an Express parcel cannot be upgraded) **Algorithms** (how the three heaps work: costs, cascading cuts, amortised analysis) and **Benchmarks** (charts and a table from the saved benchmark results, or a file you open).
 
 ```powershell
 # terminal 1: the calculation server

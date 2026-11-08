@@ -4,6 +4,7 @@ import GraphBoard from '../src/components/GraphBoard.jsx';
 import LineChart from '../src/charts/LineChart.jsx';
 import App, { pageFromHash } from '../src/App.jsx';
 import MergePanel from '../src/components/MergePanel.jsx';
+import AlgorithmsPage from '../src/pages/AlgorithmsPage.jsx';
 import { demoCity } from '../src/city.js';
 
 afterEach(() => { vi.unstubAllGlobals(); window.location.hash = ''; });
@@ -51,6 +52,7 @@ describe('LineChart', () => {
 describe('App', () => {
   it('maps hashes to pages', () => {
     expect(pageFromHash('#/dispatch')).toBe('dispatch');
+    expect(pageFromHash('#/algorithms')).toBe('algorithms');
     expect(pageFromHash('#/nope')).toBe('routes');
     expect(pageFromHash('')).toBe('routes');
   });
@@ -112,5 +114,36 @@ describe('MergePanel', () => {
   it('cannot merge when there are no parcels', () => {
     render(<MergePanel city={{ ...demoCity(), parcels: [], upgrades: [] }} />);
     expect(screen.getByRole('button', { name: 'Merge and dispatch' })).toBeDisabled();
+  });
+});
+
+describe('AlgorithmsPage', () => {
+  it('explains the three heaps and shows the cost table', () => {
+    render(<AlgorithmsPage />);
+    expect(screen.getByRole('heading', { name: 'Algorithms', level: 1 })).toBeInTheDocument();
+    for (const name of ['Binary Heap', 'Binomial Heap', 'Fibonacci Heap']) {
+      expect(screen.getByRole('heading', { name, level: 3 })).toBeInTheDocument();
+    }
+    const table = screen.getAllByRole('table')[0];
+    for (const op of ['insert', 'extract-min', 'decrease-key', 'merge']) {
+      expect(table).toHaveTextContent(op);
+    }
+  });
+  it('covers cascading cuts, amortised analysis and how the algorithms use the heaps', () => {
+    render(<AlgorithmsPage />);
+    expect(screen.getByRole('heading', { name: 'Cascading cuts' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Why the costs are amortised' })).toBeInTheDocument();
+    expect(screen.getByText('Dijkstra')).toBeInTheDocument();
+    expect(screen.getByText('Prim')).toBeInTheDocument();
+  });
+  it('links to the Benchmarks page and quotes no measured numbers', () => {
+    const { container } = render(<AlgorithmsPage />);
+    expect(screen.getByRole('link', { name: 'Benchmarks page' })).toHaveAttribute('href', '#/benchmarks');
+    expect(container.textContent).not.toMatch(/\d+(\.\d+)?\s*ms\b/);
+  });
+  it('is reachable from the navigation', () => {
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('failed'); }));
+    render(<App />);
+    expect(screen.getByRole('link', { name: 'Algorithms' })).toHaveAttribute('href', '#/algorithms');
   });
 });
